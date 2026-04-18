@@ -118,49 +118,94 @@ runs:
               Verbose               = $true
             }
 
-            try {
-              switch ($deploymentType) {
-                "managementGroup" {
-                  Write-Host "Running Management Group What-If: $deploymentName" -ForegroundColor Cyan
-                  $whatIfParameters.Location = $env:LOCATION
-                  $whatIfParameters.ManagementGroupId = $intRootMgId
-                  $result = New-AzManagementGroupDeployment @whatIfParameters
-                }
-                "subscription" {
-                  if (-not [string]::IsNullOrWhiteSpace($env:SUBSCRIPTION_ID)) {
-                    Write-Host "Setting subscription context to: $env:SUBSCRIPTION_ID" -ForegroundColor Cyan
-                    Select-AzSubscription -SubscriptionId $env:SUBSCRIPTION_ID | Out-Null
-                  }
+            # Retry configuration for What-If operations
+            # ARM API rate limit is 150 requests/minute at tenant level
+            # ALZ governance templates can exhaust this with a single What-If
+            $whatIfRetryCount = 0
+            $whatIfRetryMax = 5
+            $whatIfRetryDelays = @(60, 90, 120, 180, 300)  # Exponential backoff in seconds
+            $whatIfSuccess = $false
 
-                  Write-Host "Running Subscription What-If: $deploymentName" -ForegroundColor Cyan
-                  $whatIfParameters.Location = $env:LOCATION
-                  $result = New-AzSubscriptionDeployment @whatIfParameters
-                }
-                "resourceGroup" {
-                  if (-not [string]::IsNullOrWhiteSpace($env:SUBSCRIPTION_ID)) {
-                    Write-Host "Setting subscription context to: $env:SUBSCRIPTION_ID" -ForegroundColor Cyan
-                    Select-AzSubscription -SubscriptionId $env:SUBSCRIPTION_ID | Out-Null
-                  }
-
-                  Write-Host "Running Resource Group What-If: $deploymentName" -ForegroundColor Cyan
-                  $whatIfParameters.ResourceGroupName = $env:RESOURCE_GROUP_NAME
-                  $result = New-AzResourceGroupDeployment @whatIfParameters
-                }
-                default {
-                  Write-Error "Invalid deployment type: $deploymentType"
-                  throw "Invalid deployment type: $deploymentType"
-                }
+            while ($whatIfRetryCount -lt $whatIfRetryMax -and -not $whatIfSuccess) {
+              if ($whatIfRetryCount -gt 0) {
+                $retryDelay = $whatIfRetryDelays[$whatIfRetryCount - 1]
+                Write-Host ""
+                Write-Host "================================================" -ForegroundColor Yellow
+                Write-Host "⚠ Rate limit hit - Retry attempt $whatIfRetryCount of $whatIfRetryMax" -ForegroundColor Yellow
+                Write-Host "  Waiting $retryDelay seconds for ARM API rate limit to reset..." -ForegroundColor Yellow
+                Write-Host "================================================" -ForegroundColor Yellow
+                Start-Sleep -Seconds $retryDelay
+                Write-Host "Resuming What-If operation..." -ForegroundColor Yellow
+                Write-Host ""
               }
 
-              Write-Host ""
-              Write-Host "================================================" -ForegroundColor Green
-              Write-Host "✓ What-If Validation Succeeded: $deploymentName" -ForegroundColor Green
-              Write-Host "================================================" -ForegroundColor Green
-              Write-Host ""
+              try {
+                switch ($deploymentType) {
+                  "managementGroup" {
+                    Write-Host "Running Management Group What-If: $deploymentName" -ForegroundColor Cyan
+                    $whatIfParameters.Location = $env:LOCATION
+                    $whatIfParameters.ManagementGroupId = $intRootMgId
+                    $result = New-AzManagementGroupDeployment @whatIfParameters
+                  }
+                  "subscription" {
+                    if (-not [string]::IsNullOrWhiteSpace($env:SUBSCRIPTION_ID)) {
+                      Write-Host "Setting subscription context to: $env:SUBSCRIPTION_ID" -ForegroundColor Cyan
+                      Select-AzSubscription -SubscriptionId $env:SUBSCRIPTION_ID | Out-Null
+                    }
 
-            } catch {
-              Write-Error "What-If validation failed: $($_.Exception.Message)"
-              throw
+                    Write-Host "Running Subscription What-If: $deploymentName" -ForegroundColor Cyan
+                    $whatIfParameters.Location = $env:LOCATION
+                    $result = New-AzSubscriptionDeployment @whatIfParameters
+                  }
+                  "resourceGroup" {
+                    if (-not [string]::IsNullOrWhiteSpace($env:SUBSCRIPTION_ID)) {
+                      Write-Host "Setting subscription context to: $env:SUBSCRIPTION_ID" -ForegroundColor Cyan
+                      Select-AzSubscription -SubscriptionId $env:SUBSCRIPTION_ID | Out-Null
+                    }
+
+                    Write-Host "Running Resource Group What-If: $deploymentName" -ForegroundColor Cyan
+                    $whatIfParameters.ResourceGroupName = $env:RESOURCE_GROUP_NAME
+                    $result = New-AzResourceGroupDeployment @whatIfParameters
+                  }
+                  default {
+                    Write-Error "Invalid deployment type: $deploymentType"
+                    throw "Invalid deployment type: $deploymentType"
+                  }
+                }
+
+                # If we get here without exception, What-If succeeded
+                $whatIfSuccess = $true
+                Write-Host ""
+                Write-Host "================================================" -ForegroundColor Green
+                Write-Host "✓ What-If Validation Succeeded: $deploymentName" -ForegroundColor Green
+                Write-Host "================================================" -ForegroundColor Green
+                Write-Host ""
+
+              } catch {
+                $errorMessage = $_.Exception.Message
+                
+                # Check if this is a rate limit error (429 Too Many Requests)
+                $isRateLimitError = $errorMessage -match "Too Many Requests" -or 
+                                    $errorMessage -match "429" -or 
+                                    $errorMessage -match "throttl" -or
+                                    $errorMessage -match "rate limit" -or
+                                    $errorMessage -match "TenantandUserLevel"
+                
+                if ($isRateLimitError -and $whatIfRetryCount -lt ($whatIfRetryMax - 1)) {
+                  Write-Warning "ARM API rate limit encountered: $errorMessage"
+                  $whatIfRetryCount++
+                  # Continue to next iteration of while loop
+                } else {
+                  # Not a rate limit error, or we've exhausted retries
+                  Write-Error "What-If validation failed: $errorMessage"
+                  throw
+                }
+              }
+            }
+
+            if (-not $whatIfSuccess) {
+              Write-Error "What-If validation failed after $whatIfRetryMax retry attempts due to persistent rate limiting"
+              throw "What-If validation failed after $whatIfRetryMax retry attempts"
             }
 
           } else {
