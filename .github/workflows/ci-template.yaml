@@ -91,6 +91,15 @@ jobs:
           firstRunWhatIf: 'false'
           whatIfEnabled: 'true'
 
+      # Rate limit delay - int-root contains hundreds of policy definitions
+      # ARM API allows 150 requests/minute at tenant level - this step alone can exhaust half
+      - name: 'Rate Limit Delay - After Int-Root'
+        run: |
+          Write-Host "Waiting 90 seconds after int-root to allow ARM API rate limit window to reset..."
+          Start-Sleep -Seconds 90
+          Write-Host "Resuming workflow"
+        shell: pwsh
+
       - name: 'What If: Governance-Landing Zones'
         uses: Spaidoso/alz-mgmt-templates/.github/actions/bicep-deploy@main
         with:
@@ -146,6 +155,15 @@ jobs:
           deploymentType: 'managementGroup'
           firstRunWhatIf: 'false'
           whatIfEnabled: 'true'
+
+      # Rate limit delay - platform contains many policy assignments
+      # ARM API allows 150 requests/minute at tenant level
+      - name: 'Rate Limit Delay - After Platform'
+        run: |
+          Write-Host "Waiting 90 seconds after platform to allow ARM API rate limit window to reset..."
+          Start-Sleep -Seconds 90
+          Write-Host "Resuming workflow"
+        shell: pwsh
 
       - name: 'What If: Governance-Platform Connectivity'
         uses: Spaidoso/alz-mgmt-templates/.github/actions/bicep-deploy@main
