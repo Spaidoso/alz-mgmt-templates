@@ -44,6 +44,17 @@ Triggered by: `workflow_call` from consumer repos (push to main)
 | **whatif** | Runs What-If (skippable via `skip_what_if` input) |
 | **deploy** | Deploys all Bicep templates (requires `alz-mgmt-apply` environment approval) |
 
+### Reusable workflow-level inputs
+
+Both templates now support reusable runner/environment settings for workload repositories.
+
+| Input | Type | Default | Applies To | Description |
+|-------|------|---------|------------|-------------|
+| `runs_on` | string | `ubuntu-latest` | CI + CD | Runner label/group used by jobs |
+| `environment_plan` | string | `alz-mgmt-plan` | CI + CD | Environment used for What-If/plan jobs |
+| `environment_apply` | string | `alz-mgmt-apply` | CD | Environment used for deploy job |
+| `concurrency_group` | string | `mgmt-tfstate` | CI + CD | Concurrency key to serialize runs |
+
 #### CD Workflow Inputs
 
 | Input | Type | Default | Description |
@@ -65,6 +76,7 @@ Triggered by: `workflow_call` from consumer repos (push to main)
 | `governance-landingzones-rbac` | boolean | `true` | Deploy landing zones RBAC |
 | `core-logging` | boolean | `true` | Deploy Log Analytics |
 | `networking-hubnetworking` | boolean | `true` | Deploy hub networking |
+| `workload-github-runner` | boolean | `false` | Deploy shared workload self-hosted runner platform |
 
 ---
 
