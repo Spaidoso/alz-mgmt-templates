@@ -68,7 +68,7 @@ on:
         default: true
       workload-github-runner:
         type: boolean
-        default: false
+        default: true
 
 jobs:
   whatif:
