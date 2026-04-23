@@ -2,12 +2,22 @@
 name: Continuous Integration
 on:
   workflow_call:
+    inputs:
+      runs_on:
+        type: string
+        default: ubuntu-latest
+      environment_plan:
+        type: string
+        default: alz-mgmt-plan
+      concurrency_group:
+        type: string
+        default: mgmt-tfstate
 
 jobs:
   validate:
     name: Validate Bicep
     runs-on:
-      ubuntu-latest
+      ${{ inputs.runs_on }}
     permissions:
       contents: read
 
@@ -43,9 +53,9 @@ jobs:
   whatif:
     name: What If
     runs-on:
-      ubuntu-latest
-    concurrency: mgmt-tfstate
-    environment: alz-mgmt-plan
+      ${{ inputs.runs_on }}
+    concurrency: ${{ inputs.concurrency_group }}
+    environment: ${{ inputs.environment_plan }}
     permissions:
       id-token: write
       contents: read

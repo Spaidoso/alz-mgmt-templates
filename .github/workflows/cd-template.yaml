@@ -3,6 +3,18 @@ name: Continuous Delivery
 on:
   workflow_call:
     inputs:
+      runs_on:
+        type: string
+        default: ubuntu-latest
+      environment_plan:
+        type: string
+        default: alz-mgmt-plan
+      environment_apply:
+        type: string
+        default: alz-mgmt-apply
+      concurrency_group:
+        type: string
+        default: mgmt-tfstate
       skip_what_if:
         default: false
         type: boolean
@@ -54,14 +66,17 @@ on:
       networking-hubnetworking:
         type: boolean
         default: true
+      workload-github-runner:
+        type: boolean
+        default: false
 
 jobs:
   whatif:
     name: What If
     runs-on:
-      ubuntu-latest
-    concurrency: mgmt-tfstate
-    environment: alz-mgmt-plan
+      ${{ inputs.runs_on }}
+    concurrency: ${{ inputs.concurrency_group }}
+    environment: ${{ inputs.environment_plan }}
     permissions:
       id-token: write
       contents: read
@@ -339,15 +354,30 @@ jobs:
           firstRunWhatIf: 'false'
           whatIfEnabled: 'true'
 
+      - name: 'Plan: Workload-GitHub Runner'
+        uses: Spaidoso/alz-mgmt-templates/.github/actions/bicep-deploy@main
+        if: ${{ inputs.workload-github-runner }}
+        with:
+          name: 'workload-github-runner'
+          displayName: 'Workload-GitHub Runner'
+          templateFilePath: 'templates/workload/github-runner/main.bicep'
+          templateParametersFilePath: 'templates/workload/github-runner/main.bicepparam'
+          subscriptionId: '${{ env.SUBSCRIPTION_ID_ONLINE_LZ }}'
+          resourceGroupName: ''
+          location: '${{ env.LOCATION }}'
+          deploymentType: 'subscription'
+          firstRunWhatIf: 'false'
+          whatIfEnabled: 'true'
+
 
   deploy:
     name: Deploy
     needs: whatif
     if: ${{ always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     runs-on:
-      ubuntu-latest
-    concurrency: mgmt-tfstate
-    environment: alz-mgmt-apply
+      ${{ inputs.runs_on }}
+    concurrency: ${{ inputs.concurrency_group }}
+    environment: ${{ inputs.environment_apply }}
     permissions:
       id-token: write
       contents: read
@@ -583,6 +613,19 @@ jobs:
           templateFilePath: 'templates/networking/hubnetworking/main.bicep'
           templateParametersFilePath: 'templates/networking/hubnetworking/main.bicepparam'
           subscriptionId: '${{ env.SUBSCRIPTION_ID_CONNECTIVITY }}'
+          resourceGroupName: ''
+          location: '${{ env.LOCATION }}'
+          deploymentType: 'subscription'
+
+      - name: 'Deploy: Workload-GitHub Runner'
+        uses: Spaidoso/alz-mgmt-templates/.github/actions/bicep-deploy@main
+        if: ${{ inputs.workload-github-runner }}
+        with:
+          name: 'workload-github-runner'
+          displayName: 'Workload-GitHub Runner'
+          templateFilePath: 'templates/workload/github-runner/main.bicep'
+          templateParametersFilePath: 'templates/workload/github-runner/main.bicepparam'
+          subscriptionId: '${{ env.SUBSCRIPTION_ID_ONLINE_LZ }}'
           resourceGroupName: ''
           location: '${{ env.LOCATION }}'
           deploymentType: 'subscription'
