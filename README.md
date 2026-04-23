@@ -76,7 +76,7 @@ Both templates now support reusable runner/environment settings for workload rep
 | `governance-landingzones-rbac` | boolean | `true` | Deploy landing zones RBAC |
 | `core-logging` | boolean | `true` | Deploy Log Analytics |
 | `networking-hubnetworking` | boolean | `true` | Deploy hub networking |
-| `workload-github-runner` | boolean | `false` | Deploy shared workload self-hosted runner platform |
+| `workload-github-runner` | boolean | `true` | Deploy shared workload self-hosted runner platform |
 
 ---
 
