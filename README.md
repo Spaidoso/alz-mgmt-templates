@@ -78,6 +78,12 @@ Both templates now support reusable runner/environment settings for workload rep
 | `networking-hubnetworking` | boolean | `true` | Deploy hub networking |
 | `workload-github-runner` | boolean | `true` | Deploy shared workload self-hosted runner platform |
 
+#### CD Workflow Secrets
+
+| Secret | Required | Description |
+|--------|----------|-------------|
+| `RUNNER_SSH_PUBLIC_KEY` | No | Admin SSH public key for the runner VM. Injected at deploy time via `parameterOverrides` on the runner step. Set in both `alz-mgmt-plan` and `alz-mgmt-apply` environments. |
+
 ---
 
 ## Composite Actions
@@ -98,6 +104,7 @@ Deploys Bicep templates using Azure Deployment Stacks.
 | `deploymentType` | Yes | `managementGroup`, `subscription`, or `resourceGroup` |
 | `whatIfEnabled` | No | Run What-If only (default: `false`) |
 | `firstRunWhatIf` | No | Run What-If on first deployment (default: `false`) |
+| `parameterOverrides` | No | JSON object of parameter overrides to supplement the param file, e.g. `{"parKey":"value"}`. When non-empty, the `.bicepparam` is compiled to ARM JSON, overrides are merged, and `TemplateParameterObject` is used exclusively. |
 
 ### `bicep-variables`
 

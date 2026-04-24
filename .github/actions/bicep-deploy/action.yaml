@@ -122,7 +122,10 @@ runs:
               Verbose               = $true
             }
 
-            # Apply parameter overrides if specified
+            # Apply parameter overrides if specified.
+            # TemplateParameterFile and TemplateParameterObject are mutually exclusive parameter sets
+            # in Az PowerShell cmdlets. When overrides are needed, compile the .bicepparam to ARM
+            # JSON via bicep build-params, merge the overrides, and use TemplateParameterObject only.
             $paramOverrideJson = $env:PARAMETER_OVERRIDES
             if (-not [string]::IsNullOrWhiteSpace($paramOverrideJson)) {
               try {
@@ -134,11 +137,23 @@ runs:
                   }
                 }
                 if ($paramOverrides.Count -gt 0) {
-                  $whatIfParameters['TemplateParameterObject'] = $paramOverrides
+                  $tempJson = Join-Path $env:RUNNER_TEMP ("params-whatif-{0}.json" -f [System.Guid]::NewGuid())
+                  bicep build-params $env:TEMPLATE_PARAMETERS_FILE_PATH --outfile $tempJson 2>&1 | Out-Null
+                  $allParams = @{}
+                  if (Test-Path $tempJson) {
+                    $compiled = Get-Content $tempJson -Raw | ConvertFrom-Json
+                    foreach ($p in $compiled.parameters.PSObject.Properties) {
+                      $allParams[$p.Name] = $p.Value.value
+                    }
+                    Remove-Item $tempJson -Force -ErrorAction SilentlyContinue
+                  }
+                  foreach ($k in $paramOverrides.Keys) { $allParams[$k] = $paramOverrides[$k] }
+                  $null = $whatIfParameters.Remove('TemplateParameterFile')
+                  $whatIfParameters['TemplateParameterObject'] = $allParams
                   Write-Host "Parameter overrides applied for what-if: $($paramOverrides.Keys -join ', ')" -ForegroundColor DarkGray
                 }
               } catch {
-                Write-Warning "Failed to parse parameterOverrides: $($_.Exception.Message)"
+                Write-Warning "Failed to apply parameterOverrides: $($_.Exception.Message)"
               }
             }
 
@@ -244,7 +259,10 @@ runs:
               Verbose               = $true
             }
 
-            # Apply parameter overrides if specified
+            # Apply parameter overrides if specified.
+            # TemplateParameterFile and TemplateParameterObject are mutually exclusive parameter sets
+            # in Az PowerShell cmdlets. When overrides are needed, compile the .bicepparam to ARM
+            # JSON via bicep build-params, merge the overrides, and use TemplateParameterObject only.
             $paramOverrideJson = $env:PARAMETER_OVERRIDES
             if (-not [string]::IsNullOrWhiteSpace($paramOverrideJson)) {
               try {
@@ -256,11 +274,23 @@ runs:
                   }
                 }
                 if ($paramOverrides.Count -gt 0) {
-                  $stackParameters['TemplateParameterObject'] = $paramOverrides
+                  $tempJson = Join-Path $env:RUNNER_TEMP ("params-deploy-{0}.json" -f [System.Guid]::NewGuid())
+                  bicep build-params $env:TEMPLATE_PARAMETERS_FILE_PATH --outfile $tempJson 2>&1 | Out-Null
+                  $allParams = @{}
+                  if (Test-Path $tempJson) {
+                    $compiled = Get-Content $tempJson -Raw | ConvertFrom-Json
+                    foreach ($p in $compiled.parameters.PSObject.Properties) {
+                      $allParams[$p.Name] = $p.Value.value
+                    }
+                    Remove-Item $tempJson -Force -ErrorAction SilentlyContinue
+                  }
+                  foreach ($k in $paramOverrides.Keys) { $allParams[$k] = $paramOverrides[$k] }
+                  $null = $stackParameters.Remove('TemplateParameterFile')
+                  $stackParameters['TemplateParameterObject'] = $allParams
                   Write-Host "Parameter overrides applied for deploy: $($paramOverrides.Keys -join ', ')" -ForegroundColor DarkGray
                 }
               } catch {
-                Write-Warning "Failed to parse parameterOverrides: $($_.Exception.Message)"
+                Write-Warning "Failed to apply parameterOverrides: $($_.Exception.Message)"
               }
             }
 
