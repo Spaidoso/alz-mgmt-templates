@@ -34,6 +34,10 @@ inputs:
     description: 'Enable what-if mode (validation only, no deployment)'
     required: false
     default: 'false'
+  parameterOverrides:
+    description: 'JSON object of parameter overrides to supplement the parameter file, e.g. {"parKey":"value"}'
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -116,6 +120,26 @@ runs:
               WhatIf                = $true
               ValidationLevel       = "providerNoRbac"
               Verbose               = $true
+            }
+
+            # Apply parameter overrides if specified
+            $paramOverrideJson = $env:PARAMETER_OVERRIDES
+            if (-not [string]::IsNullOrWhiteSpace($paramOverrideJson)) {
+              try {
+                $overrideObj = $paramOverrideJson | ConvertFrom-Json
+                $paramOverrides = @{}
+                foreach ($prop in $overrideObj.PSObject.Properties) {
+                  if (-not [string]::IsNullOrWhiteSpace([string]$prop.Value)) {
+                    $paramOverrides[$prop.Name] = $prop.Value
+                  }
+                }
+                if ($paramOverrides.Count -gt 0) {
+                  $whatIfParameters['TemplateParameterObject'] = $paramOverrides
+                  Write-Host "Parameter overrides applied for what-if: $($paramOverrides.Keys -join ', ')" -ForegroundColor DarkGray
+                }
+              } catch {
+                Write-Warning "Failed to parse parameterOverrides: $($_.Exception.Message)"
+              }
             }
 
             # Retry configuration for What-If operations
@@ -218,6 +242,26 @@ runs:
               ActionOnUnmanage      = "DeleteAll"
               Force                 = $true
               Verbose               = $true
+            }
+
+            # Apply parameter overrides if specified
+            $paramOverrideJson = $env:PARAMETER_OVERRIDES
+            if (-not [string]::IsNullOrWhiteSpace($paramOverrideJson)) {
+              try {
+                $overrideObj = $paramOverrideJson | ConvertFrom-Json
+                $paramOverrides = @{}
+                foreach ($prop in $overrideObj.PSObject.Properties) {
+                  if (-not [string]::IsNullOrWhiteSpace([string]$prop.Value)) {
+                    $paramOverrides[$prop.Name] = $prop.Value
+                  }
+                }
+                if ($paramOverrides.Count -gt 0) {
+                  $stackParameters['TemplateParameterObject'] = $paramOverrides
+                  Write-Host "Parameter overrides applied for deploy: $($paramOverrides.Keys -join ', ')" -ForegroundColor DarkGray
+                }
+              } catch {
+                Write-Warning "Failed to parse parameterOverrides: $($_.Exception.Message)"
+              }
             }
 
             $retryCount = 0
@@ -379,3 +423,4 @@ runs:
         DEPLOYMENT_TYPE: ${{ inputs.deploymentType }}
         FIRST_RUN_WHAT_IF: ${{ inputs.firstRunWhatIf }}
         WHAT_IF_ENABLED: ${{ inputs.whatIfEnabled }}
+        PARAMETER_OVERRIDES: ${{ inputs.parameterOverrides }}

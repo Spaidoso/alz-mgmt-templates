@@ -69,6 +69,10 @@ on:
       workload-github-runner:
         type: boolean
         default: true
+    secrets:
+      RUNNER_SSH_PUBLIC_KEY:
+        description: 'Admin SSH public key for the runner VM'
+        required: false
 
 jobs:
   whatif:
@@ -368,6 +372,7 @@ jobs:
           deploymentType: 'subscription'
           firstRunWhatIf: 'false'
           whatIfEnabled: 'true'
+          parameterOverrides: '{"parRunnerAdminSshPublicKey":"${{ secrets.RUNNER_SSH_PUBLIC_KEY }}"}'
 
 
   deploy:
@@ -629,4 +634,5 @@ jobs:
           resourceGroupName: ''
           location: '${{ env.LOCATION }}'
           deploymentType: 'subscription'
+          parameterOverrides: '{"parRunnerAdminSshPublicKey":"${{ secrets.RUNNER_SSH_PUBLIC_KEY }}"}'
 
