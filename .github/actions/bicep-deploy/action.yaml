@@ -134,7 +134,11 @@ runs:
                   }
                 }
                 if ($paramOverrides.Count -gt 0) {
-                  $whatIfParameters['TemplateParameterObject'] = $paramOverrides
+                  # Splat overrides as individual dynamic parameters — TemplateParameterObject
+                  # conflicts with TemplateParameterFile (different parameter sets).
+                  foreach ($key in $paramOverrides.Keys) {
+                    $whatIfParameters[$key] = $paramOverrides[$key]
+                  }
                   Write-Host "Parameter overrides applied for what-if: $($paramOverrides.Keys -join ', ')" -ForegroundColor DarkGray
                 }
               } catch {
@@ -256,7 +260,11 @@ runs:
                   }
                 }
                 if ($paramOverrides.Count -gt 0) {
-                  $stackParameters['TemplateParameterObject'] = $paramOverrides
+                  # Splat overrides as individual dynamic parameters — TemplateParameterObject
+                  # conflicts with TemplateParameterFile (different parameter sets).
+                  foreach ($key in $paramOverrides.Keys) {
+                    $stackParameters[$key] = $paramOverrides[$key]
+                  }
                   Write-Host "Parameter overrides applied for deploy: $($paramOverrides.Keys -join ', ')" -ForegroundColor DarkGray
                 }
               } catch {
